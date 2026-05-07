@@ -48,7 +48,10 @@ async def receive_price(request: Request):
 
         for ws in clients:
             try:
-                await ws.send_json(data)
+                await ws.send_json([{
+    "symbol": data["symbol"],
+    "price": data["bid"]
+}])
             except Exception as e:
                 print("WS send failed:", e)
                 dead_clients.append(ws)
