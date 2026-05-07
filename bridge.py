@@ -1,48 +1,52 @@
-from fastapi import FastAPI, Request
-import asyncio
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 import json
-import websocket
-import threading
 
 app = FastAPI()
 
-WS_URL = "wss://tradepro-backend-production-feec.up.railway.app"
+clients = []
 
-ws = None
+# Frontend connects here
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    clients.append(websocket)
+    print("Frontend connected")
 
-def connect_ws():
-    global ws
-    ws = websocket.WebSocket()
-    ws.connect(WS_URL)
-    print("Connected to WebSocket")
-
-def send_to_ws(data):
     try:
-        if ws:
-            payload = [
-                {
-                    "symbol": data["symbol"],
-                    "price": data["bid"]
-                }
-            ]
-            ws.send(json.dumps(payload))
-            print("Sent to WS:", payload)
-    except Exception as e:
-        print("WS Error:", e)
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        clients.remove(websocket)
+        print("Frontend disconnected")
 
+
+# MT5 sends prices here
 @app.post("/price")
 async def receive_price(request: Request):
-    data = await request.json()
-    send_to_ws(data)
+    body = await request.body()
+    text = body.decode(errors="ignore").strip()
+
+    try:
+        end = text.find("}") + 1
+        clean = text[:end]
+
+        data = json.loads(clean)
+
+        print("Received:", data)
+
+        alive_clients = []
+
+        for ws in clients:
+            try:
+                await ws.send_json(data)
+                alive_clients.append(ws)
+            except:
+                print("Dead websocket removed")
+
+        clients[:] = alive_clients
+
+    except Exception as e:
+        print("ERROR:", e)
+        print("RAW:", text)
+
     return {"status": "ok"}
-
-def start_ws():
-    while True:
-        try:
-            connect_ws()
-            break
-        except:
-            print("Retrying WebSocket...")
-            asyncio.sleep(2)
-
-threading.Thread(target=start_ws).start()
