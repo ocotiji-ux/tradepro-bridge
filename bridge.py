@@ -44,6 +44,9 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
+	# Normalize broker symbols
+	if data["symbol"] == "GOLD":
+    	data["symbol"] = "XAUUSD"
         dead_clients = []
 
         for ws in clients:
