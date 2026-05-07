@@ -3,30 +3,34 @@ import json
 
 app = FastAPI()
 
-clients = []
+clients = set()
 
-# Frontend connects here
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    clients.append(websocket)
+    clients.add(websocket)
+
     print("Frontend connected")
 
     try:
         while True:
+            # keep alive
             await websocket.receive_text()
+
     except WebSocketDisconnect:
-        clients.remove(websocket)
         print("Frontend disconnected")
 
+    finally:
+        clients.discard(websocket)
 
-# MT5 sends prices here
+
 @app.post("/price")
 async def receive_price(request: Request):
-    body = await request.body()
-    text = body.decode(errors="ignore").strip()
 
     try:
+        body = await request.body()
+        text = body.decode(errors="ignore").strip()
+
         end = text.find("}") + 1
         clean = text[:end]
 
@@ -34,19 +38,19 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
-        alive_clients = []
+        dead_clients = []
 
         for ws in clients:
             try:
                 await ws.send_json(data)
-                alive_clients.append(ws)
-            except:
-                print("Dead websocket removed")
+            except Exception as e:
+                print("WS send failed:", e)
+                dead_clients.append(ws)
 
-        clients[:] = alive_clients
+        for ws in dead_clients:
+            clients.discard(ws)
 
     except Exception as e:
         print("ERROR:", e)
-        print("RAW:", text)
 
     return {"status": "ok"}
