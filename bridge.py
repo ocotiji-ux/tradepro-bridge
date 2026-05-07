@@ -33,6 +33,8 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post("/price")
 async def receive_price(request: Request):
 
+    dead_clients = []
+
     try:
         body = await request.body()
         text = body.decode(errors="ignore").strip()
@@ -44,18 +46,18 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
-	# Normalize broker symbols safely
-symbol = data.get("symbol", "")
+        # Normalize broker symbols safely
+        symbol = data.get("symbol", "")
 
-if symbol == "GOLD":
-    data["symbol"] = "XAUUSD"
+        if symbol == "GOLD":
+            data["symbol"] = "XAUUSD"
 
         for ws in clients:
             try:
                 await ws.send_json([{
-    "symbol": data["symbol"],
-    "price": data["bid"]
-}])
+                    "symbol": data["symbol"],
+                    "price": data["bid"]
+                }])
             except Exception as e:
                 print("WS send failed:", e)
                 dead_clients.append(ws)
