@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 import json
+import asyncio
 
 app = FastAPI()
 
@@ -14,15 +15,20 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # keep alive
-            await websocket.receive_text()
+            await asyncio.sleep(30)
+
+            try:
+                await websocket.send_json({
+                    "type": "heartbeat"
+                })
+            except:
+                break
 
     except WebSocketDisconnect:
         print("Frontend disconnected")
 
     finally:
         clients.discard(websocket)
-
 
 @app.post("/price")
 async def receive_price(request: Request):
