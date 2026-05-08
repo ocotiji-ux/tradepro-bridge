@@ -96,7 +96,8 @@ async def receive_trade(request: Request):
             "status": "error"
         }
 
-@app.get("/next-trade")
+@app.api_route("/next-trade", methods=["GET", "POST"])
+
 async def next_trade():
 
     global latest_trade
