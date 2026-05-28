@@ -1,26 +1,49 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
 import json
 import asyncio
 
+# =====================================================
+# FASTAPI APP
+# =====================================================
+
 app = FastAPI()
+
+# =====================================================
+# CORS MIDDLEWARE
+# =====================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =====================================================
+# GLOBALS
+# =====================================================
 
 clients = set()
 
 latest_trade = None
 
-
-# ===============================
+# =====================================================
 # TRADE SIGNAL MODEL
-# ===============================
+# =====================================================
+
 class TradeSignal(BaseModel):
     symbol: str
     action: str
+    lot: float = 0.01
 
-
-# ===============================
+# =====================================================
 # WEBSOCKET ENDPOINT
-# ===============================
+# =====================================================
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
 
@@ -34,7 +57,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         while True:
 
-            # keep connection alive
+            # Keep websocket alive
             await websocket.receive_text()
 
     except WebSocketDisconnect:
@@ -51,9 +74,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
         print("Client removed")
 
-# ===============================
-# RECEIVE MT5 PRICE DATA
-# ===============================
+# =====================================================
+# RECEIVE MT5 TELEMETRY
+# =====================================================
+
 @app.post("/price")
 async def receive_price(request: Request):
 
@@ -73,13 +97,14 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
+        # Normalize broker symbols
         symbol = data.get("symbol", "")
 
         if symbol == "GOLD":
             data["symbol"] = "XAUUSD"
 
         # ==========================================
-        # SEND PRICE DATA
+        # BROADCAST TELEMETRY
         # ==========================================
 
         for ws in clients:
@@ -104,6 +129,7 @@ async def receive_price(request: Request):
 
                 dead_clients.append(ws)
 
+        # Remove dead sockets
         for ws in dead_clients:
 
             clients.discard(ws)
@@ -114,9 +140,10 @@ async def receive_price(request: Request):
 
     return {"status": "ok"}
 
-# ===============================
-# RECEIVE REMOTE TRADE SIGNAL
-# ===============================
+# =====================================================
+# RECEIVE TRADE FROM FRONTEND
+# =====================================================
+
 @app.post("/trade")
 async def receive_trade(signal: TradeSignal):
 
@@ -138,23 +165,27 @@ async def receive_trade(signal: TradeSignal):
         print("TRADE ERROR:", e)
 
         return {
-            "status": "error"
+            "status": "error",
+            "message": str(e)
         }
 
-
-# ===============================
+# =====================================================
 # MT5 POLLS FOR NEXT TRADE
-# ===============================
+# =====================================================
+
 @app.api_route("/next-trade", methods=["GET", "POST"])
 async def next_trade():
 
     global latest_trade
 
     if latest_trade is None:
+
         return {}
 
     trade = latest_trade
 
     latest_trade = None
+
+    print("TRADE DELIVERED TO MT5:", trade)
 
     return trade
