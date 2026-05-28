@@ -31,26 +31,25 @@ async def websocket_endpoint(websocket: WebSocket):
     print("Frontend connected")
 
     try:
+
         while True:
 
-            await asyncio.sleep(30)
-
-            try:
-                await websocket.send_json({
-                    "type": "heartbeat"
-                })
-
-            except:
-                break
+            # keep connection alive
+            await websocket.receive_text()
 
     except WebSocketDisconnect:
 
         print("Frontend disconnected")
 
+    except Exception as e:
+
+        print("WS ERROR:", e)
+
     finally:
 
         clients.discard(websocket)
 
+        print("Client removed")
 
 # ===============================
 # RECEIVE MT5 PRICE DATA
@@ -74,46 +73,39 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
-        # Normalize broker symbols
         symbol = data.get("symbol", "")
 
         if symbol == "GOLD":
             data["symbol"] = "XAUUSD"
 
-        # ACCOUNT METRICS
-        if data.get("type") == "account":
+        # ==========================================
+        # SEND PRICE DATA
+        # ==========================================
 
-            for ws in clients:
-                try:
-                    await ws.send_json({
-                        "type": "account",
-                        "balance": data["balance"],
-                        "equity": data["equity"],
-                        "margin_level": data["margin_level"],
-                        "free_margin": data["free_margin"],
-                        "pnl": data["pnl"]
-                    })
+        for ws in clients:
 
-                except Exception as e:
-                    print("Account WS failed:", e)
-                    dead_clients.append(ws)
+            try:
 
-        # PRICE DATA
-        else:
+                await ws.send_json({
+                    "type": "telemetry",
+                    "symbol": data.get("symbol"),
+                    "bid": data.get("bid"),
+                    "ask": data.get("ask"),
+                    "balance": data.get("balance"),
+                    "equity": data.get("equity"),
+                    "margin_level": data.get("margin_level"),
+                    "free_margin": data.get("free_margin"),
+                    "pnl": data.get("pnl")
+                })
 
-            for ws in clients:
-                try:
-                    await ws.send_json([{
-                        "symbol": data["symbol"],
-                        "price": data["bid"]
-                    }])
+            except Exception as e:
 
-                except Exception as e:
-                    print("Price WS failed:", e)
-                    dead_clients.append(ws)
+                print("WS failed:", e)
 
-        # REMOVE DEAD CLIENTS
+                dead_clients.append(ws)
+
         for ws in dead_clients:
+
             clients.discard(ws)
 
     except Exception as e:
@@ -121,7 +113,6 @@ async def receive_price(request: Request):
         print("ERROR:", e)
 
     return {"status": "ok"}
-
 
 # ===============================
 # RECEIVE REMOTE TRADE SIGNAL
