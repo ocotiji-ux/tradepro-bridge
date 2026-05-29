@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import json
-import asyncio
 
 # =====================================================
 # FASTAPI APP
@@ -12,7 +11,7 @@ import asyncio
 app = FastAPI()
 
 # =====================================================
-# CORS MIDDLEWARE
+# CORS
 # =====================================================
 
 app.add_middleware(
@@ -30,9 +29,10 @@ app.add_middleware(
 clients = set()
 
 latest_trade = None
+last_execution = None
 
 # =====================================================
-# TRADE SIGNAL MODEL
+# MODELS
 # =====================================================
 
 class TradeSignal(BaseModel):
@@ -41,7 +41,7 @@ class TradeSignal(BaseModel):
     lot: float = 0.01
 
 # =====================================================
-# WEBSOCKET ENDPOINT
+# WEBSOCKET
 # =====================================================
 
 @app.websocket("/ws")
@@ -57,7 +57,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         while True:
 
-            # Keep websocket alive
+            # Wait for client messages to keep connection alive
             await websocket.receive_text()
 
     except WebSocketDisconnect:
@@ -75,7 +75,7 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Client removed")
 
 # =====================================================
-# RECEIVE MT5 TELEMETRY
+# MT5 TELEMETRY
 # =====================================================
 
 @app.post("/price")
@@ -97,31 +97,28 @@ async def receive_price(request: Request):
 
         print("Received:", data)
 
-        # Normalize broker symbols
         symbol = data.get("symbol", "")
 
         if symbol == "GOLD":
             data["symbol"] = "XAUUSD"
 
-        # ==========================================
-        # BROADCAST TELEMETRY
-        # ==========================================
+        payload = {
+            "type": "telemetry",
+            "symbol": data.get("symbol"),
+            "bid": data.get("bid"),
+            "ask": data.get("ask"),
+            "balance": data.get("balance"),
+            "equity": data.get("equity"),
+            "margin_level": data.get("margin_level"),
+            "free_margin": data.get("free_margin"),
+            "pnl": data.get("pnl")
+        }
 
         for ws in clients:
 
             try:
 
-                await ws.send_json({
-                    "type": "telemetry",
-                    "symbol": data.get("symbol"),
-                    "bid": data.get("bid"),
-                    "ask": data.get("ask"),
-                    "balance": data.get("balance"),
-                    "equity": data.get("equity"),
-                    "margin_level": data.get("margin_level"),
-                    "free_margin": data.get("free_margin"),
-                    "pnl": data.get("pnl")
-                })
+                await ws.send_json(payload)
 
             except Exception as e:
 
@@ -129,19 +126,18 @@ async def receive_price(request: Request):
 
                 dead_clients.append(ws)
 
-        # Remove dead sockets
         for ws in dead_clients:
 
             clients.discard(ws)
 
     except Exception as e:
 
-        print("ERROR:", e)
+        print("PRICE ERROR:", e)
 
     return {"status": "ok"}
 
 # =====================================================
-# RECEIVE TRADE FROM FRONTEND
+# RECEIVE TRADE FROM APP
 # =====================================================
 
 @app.post("/trade")
@@ -170,6 +166,49 @@ async def receive_trade(signal: TradeSignal):
         }
 
 # =====================================================
+# EXECUTION ACKNOWLEDGEMENT FROM MT5
+# =====================================================
+
+@app.post("/execution-complete")
+async def execution_complete(request: Request):
+
+    global last_execution
+
+    try:
+
+        data = await request.json()
+
+        last_execution = data
+
+        print("EXECUTION ACK:", data)
+
+        print("LATEST EXECUTION UPDATED")
+
+        return {
+            "status": "received"
+        }
+
+    except Exception as e:
+
+        print("ACK ERROR:", e)
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# =====================================================
+# EXECUTION STATUS
+# =====================================================
+
+@app.get("/execution-status")
+async def execution_status():
+
+    global last_execution
+
+    return last_execution or {}
+
+# =====================================================
 # MT5 POLLS FOR NEXT TRADE
 # =====================================================
 
@@ -179,6 +218,8 @@ async def next_trade():
     global latest_trade
 
     if latest_trade is None:
+
+        print("NO PENDING TRADE")
 
         return {}
 
