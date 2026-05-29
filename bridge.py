@@ -215,7 +215,18 @@ async def update_positions(request: Request):
 
     try:
 
-        positions = await request.json()
+        body = await request.body()
+
+        text = body.decode(errors="ignore").strip()
+
+        print("RAW POSITIONS:", text)
+
+        end = text.rfind("]") + 1
+
+        if end > 0:
+            text = text[:end]
+
+        positions = json.loads(text)
 
         print(f"POSITIONS UPDATED: {len(positions)} positions")
 
@@ -232,7 +243,6 @@ async def update_positions(request: Request):
             "status": "error",
             "message": str(e)
         }
-
 # =====================================================
 # GET OPEN POSITIONS
 # =====================================================
