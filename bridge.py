@@ -30,6 +30,7 @@ clients = set()
 
 latest_trade = None
 last_execution = None
+positions = []
 
 # =====================================================
 # MODELS
@@ -57,7 +58,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
         while True:
 
-            # Wait for client messages to keep connection alive
             await websocket.receive_text()
 
     except WebSocketDisconnect:
@@ -95,8 +95,6 @@ async def receive_price(request: Request):
 
         data = json.loads(clean)
 
-        print("Received:", data)
-
         symbol = data.get("symbol", "")
 
         if symbol == "GOLD":
@@ -114,7 +112,7 @@ async def receive_price(request: Request):
             "pnl": data.get("pnl")
         }
 
-        for ws in clients:
+        for ws in list(clients):
 
             try:
 
@@ -182,8 +180,6 @@ async def execution_complete(request: Request):
 
         print("EXECUTION ACK:", data)
 
-        print("LATEST EXECUTION UPDATED")
-
         return {
             "status": "received"
         }
@@ -209,6 +205,46 @@ async def execution_status():
     return last_execution or {}
 
 # =====================================================
+# POSITION SYNC FROM MT5
+# =====================================================
+
+@app.post("/positions")
+async def update_positions(request: Request):
+
+    global positions
+
+    try:
+
+        positions = await request.json()
+
+        print(f"POSITIONS UPDATED: {len(positions)} positions")
+
+        return {
+            "status": "received",
+            "count": len(positions)
+        }
+
+    except Exception as e:
+
+        print("POSITION ERROR:", e)
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# =====================================================
+# GET OPEN POSITIONS
+# =====================================================
+
+@app.get("/positions")
+async def get_positions():
+
+    global positions
+
+    return positions
+
+# =====================================================
 # MT5 POLLS FOR NEXT TRADE
 # =====================================================
 
@@ -218,8 +254,6 @@ async def next_trade():
     global latest_trade
 
     if latest_trade is None:
-
-        print("NO PENDING TRADE")
 
         return {}
 
