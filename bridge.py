@@ -174,14 +174,23 @@ async def execution_complete(request: Request):
 
     try:
 
-        data = await request.json()
+        body = await request.body()
+
+        text = body.decode(errors="ignore")
+
+        text = text.replace("\x00", "").strip()
+
+        print("RAW EXECUTION ACK:", text)
+
+        data = json.loads(text)
 
         last_execution = data
 
         print("EXECUTION ACK:", data)
 
         return {
-            "status": "received"
+            "status": "received",
+            "execution": data
         }
 
     except Exception as e:
@@ -192,7 +201,6 @@ async def execution_complete(request: Request):
             "status": "error",
             "message": str(e)
         }
-
 # =====================================================
 # EXECUTION STATUS
 # =====================================================
@@ -217,7 +225,9 @@ async def update_positions(request: Request):
 
         body = await request.body()
 
-        text = body.decode(errors="ignore").strip()
+        text = body.decode(errors="ignore")
+
+	text = text.replace("\x00", "").strip()
 
         print("RAW POSITIONS:", text)
 
