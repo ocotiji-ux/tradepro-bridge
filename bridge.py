@@ -1,12 +1,7 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
 import json
-
-# =====================================================
-# FASTAPI APP
-# =====================================================
 
 app = FastAPI()
 
@@ -49,29 +44,22 @@ class TradeSignal(BaseModel):
 async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
-
     clients.add(websocket)
 
     print("Frontend connected")
 
     try:
-
         while True:
-
             await websocket.receive_text()
 
     except WebSocketDisconnect:
-
         print("Frontend disconnected")
 
     except Exception as e:
-
         print("WS ERROR:", e)
 
     finally:
-
         clients.discard(websocket)
-
         print("Client removed")
 
 # =====================================================
@@ -84,13 +72,12 @@ async def receive_price(request: Request):
     dead_clients = []
 
     try:
-
         body = await request.body()
 
-        text = body.decode(errors="ignore").strip()
+        text = body.decode(errors="ignore")
+        text = text.replace("\x00", "").strip()
 
         end = text.find("}") + 1
-
         clean = text[:end]
 
         data = json.loads(clean)
@@ -113,23 +100,17 @@ async def receive_price(request: Request):
         }
 
         for ws in list(clients):
-
             try:
-
                 await ws.send_json(payload)
 
             except Exception as e:
-
                 print("WS failed:", e)
-
                 dead_clients.append(ws)
 
         for ws in dead_clients:
-
             clients.discard(ws)
 
     except Exception as e:
-
         print("PRICE ERROR:", e)
 
     return {"status": "ok"}
@@ -144,7 +125,6 @@ async def receive_trade(signal: TradeSignal):
     global latest_trade
 
     try:
-
         latest_trade = signal.dict()
 
         print("TRADE RECEIVED:", latest_trade)
@@ -155,7 +135,6 @@ async def receive_trade(signal: TradeSignal):
         }
 
     except Exception as e:
-
         print("TRADE ERROR:", e)
 
         return {
@@ -173,11 +152,9 @@ async def execution_complete(request: Request):
     global last_execution
 
     try:
-
         body = await request.body()
 
         text = body.decode(errors="ignore")
-
         text = text.replace("\x00", "").strip()
 
         print("RAW EXECUTION ACK:", text)
@@ -194,13 +171,13 @@ async def execution_complete(request: Request):
         }
 
     except Exception as e:
-
         print("ACK ERROR:", e)
 
         return {
             "status": "error",
             "message": str(e)
         }
+
 # =====================================================
 # EXECUTION STATUS
 # =====================================================
@@ -222,12 +199,10 @@ async def update_positions(request: Request):
     global positions
 
     try:
-
         body = await request.body()
 
         text = body.decode(errors="ignore")
-
-	text = text.replace("\x00", "").strip()
+        text = text.replace("\x00", "").strip()
 
         print("RAW POSITIONS:", text)
 
@@ -246,13 +221,13 @@ async def update_positions(request: Request):
         }
 
     except Exception as e:
-
         print("POSITION ERROR:", e)
 
         return {
             "status": "error",
             "message": str(e)
         }
+
 # =====================================================
 # GET OPEN POSITIONS
 # =====================================================
@@ -274,7 +249,6 @@ async def next_trade():
     global latest_trade
 
     if latest_trade is None:
-
         return {}
 
     trade = latest_trade
