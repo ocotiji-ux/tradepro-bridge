@@ -27,6 +27,8 @@ latest_trade = None
 last_execution = None
 positions = []
 
+pending_position_action = None
+
 # =====================================================
 # MODELS
 # =====================================================
@@ -35,6 +37,9 @@ class TradeSignal(BaseModel):
     symbol: str
     action: str
     lot: float = 0.01
+class PositionAction(BaseModel):
+    action: str
+    ticket: int
 
 # =====================================================
 # WEBSOCKET
@@ -136,6 +141,38 @@ async def receive_trade(signal: TradeSignal):
 
     except Exception as e:
         print("TRADE ERROR:", e)
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# =====================================================
+# POSITION ACTION FROM APP
+# =====================================================
+
+@app.post("/position-action")
+async def position_action(action: PositionAction):
+
+    global pending_position_action
+
+    try:
+
+        pending_position_action = action.dict()
+
+        print(
+            "POSITION ACTION RECEIVED:",
+            pending_position_action
+        )
+
+        return {
+            "status": "queued",
+            "action": pending_position_action
+        }
+
+    except Exception as e:
+
+        print("POSITION ACTION ERROR:", e)
 
         return {
             "status": "error",
@@ -258,3 +295,29 @@ async def next_trade():
     print("TRADE DELIVERED TO MT5:", trade)
 
     return trade
+
+# =====================================================
+# MT5 POLLS FOR POSITION ACTIONS
+# =====================================================
+
+@app.api_route(
+    "/next-position-action",
+    methods=["GET", "POST"]
+)
+async def next_position_action():
+
+    global pending_position_action
+
+    if pending_position_action is None:
+        return {}
+
+    action = pending_position_action
+
+    pending_position_action = None
+
+    print(
+        "POSITION ACTION DELIVERED:",
+        action
+    )
+
+    return action
