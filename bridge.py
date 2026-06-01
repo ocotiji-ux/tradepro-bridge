@@ -40,6 +40,8 @@ class TradeSignal(BaseModel):
 class PositionAction(BaseModel):
     action: str
     ticket: int
+    sl: float | None = None
+    tp: float | None = None
 
 # =====================================================
 # WEBSOCKET
