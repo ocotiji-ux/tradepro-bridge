@@ -42,6 +42,8 @@ class PositionAction(BaseModel):
     ticket: int
     sl: float | None = None
     tp: float | None = None
+    volume: float | None = None
+    distance: int | None = None
 
 # =====================================================
 # WEBSOCKET
