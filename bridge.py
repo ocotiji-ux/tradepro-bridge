@@ -37,6 +37,10 @@ class TradeSignal(BaseModel):
     symbol: str
     action: str
     lot: float = 0.01
+    sl: float | None = None
+    tp: float | None = None
+    risk_percent: float | None = None
+    dollar_risk: float | None = None
 class PositionAction(BaseModel):
     action: str
     ticket: int
@@ -136,7 +140,10 @@ async def receive_trade(signal: TradeSignal):
     try:
         latest_trade = signal.dict()
 
-        print("TRADE RECEIVED:", latest_trade)
+        print("================================")
+print("TRADE RECEIVED")
+print(json.dumps(latest_trade, indent=2))
+print("================================")
 
         return {
             "status": "received",
@@ -296,7 +303,10 @@ async def next_trade():
 
     latest_trade = None
 
-    print("TRADE DELIVERED TO MT5:", trade)
+    print("================================")
+print("TRADE DELIVERED TO MT5")
+print(json.dumps(trade, indent=2))
+print("================================")
 
     return trade
 
