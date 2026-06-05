@@ -141,9 +141,9 @@ async def receive_trade(signal: TradeSignal):
         latest_trade = signal.dict()
 
         print("================================")
-print("TRADE RECEIVED")
-print(json.dumps(latest_trade, indent=2))
-print("================================")
+        print("TRADE RECEIVED")
+        print(json.dumps(latest_trade, indent=2))
+        print("================================")
 
         return {
             "status": "received",
@@ -157,7 +157,6 @@ print("================================")
             "status": "error",
             "message": str(e)
         }
-
 # =====================================================
 # POSITION ACTION FROM APP
 # =====================================================
@@ -304,9 +303,9 @@ async def next_trade():
     latest_trade = None
 
     print("================================")
-print("TRADE DELIVERED TO MT5")
-print(json.dumps(trade, indent=2))
-print("================================")
+    print("TRADE DELIVERED TO MT5")
+    print(json.dumps(trade, indent=2))
+    print("================================")
 
     return trade
 
