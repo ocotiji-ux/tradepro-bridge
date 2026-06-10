@@ -226,6 +226,20 @@ async def execution_complete(request: Request):
         }
 
 # =====================================================
+# API HEALTH CHECK
+# =====================================================
+
+@app.get("/api/health")
+async def health_check():
+
+    return {
+        "status": "healthy",
+        "bridge": "online",
+        "websocket_clients": len(clients),
+        "positions": len(positions)
+    }
+
+# =====================================================
 # EXECUTION STATUS
 # =====================================================
 
